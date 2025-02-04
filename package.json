@@ -1,0 +1,22 @@
+{
+  "name": "dfirst-payments",
+  "version": "1.0.0",
+  "description": "Payment verification server for DFirst Trading Bot Platform",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "nodemon server.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.0.3",
+    "express": "^4.18.2",
+    "paystack-node": "^0.3.0"
+  },
+  "devDependencies": {
+    "nodemon": "^2.0.22"
+  },
+  "engines": {
+    "node": ">=14.0.0"
+  }
+} 
