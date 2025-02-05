@@ -86,8 +86,8 @@ app.post('/payment/initialize', async (req, res) => {
     const paystackData = {
       email,
       amount: Math.round(amount * 100),
-      callback_url: `${serverUrl}/payment/verify/PSTK_CALLBACK`, // Paystack will replace PSTK_CALLBACK with the reference
-      metadata: JSON.stringify({
+      callback_url: `${serverUrl}/payment/verify`,
+      metadata: {
         custom_fields: [
           {
             display_name: "Bot Tier",
@@ -106,7 +106,7 @@ app.post('/payment/initialize', async (req, res) => {
           }
         ],
         ...metadata
-      }),
+      },
       currency: 'KES',
       channels: ['card']
     };
@@ -128,39 +128,29 @@ app.post('/payment/initialize', async (req, res) => {
 });
 
 // Payment verification endpoint
-app.get('/payment/verify/:reference', async (req, res) => {
+app.get('/payment/verify', async (req, res) => {
   try {
-    const { reference } = req.params;
+    const reference = req.query.reference;
+    
+    if (!reference) {
+      throw new Error('No reference provided');
+    }
+
+    console.log('Verifying payment reference:', reference);
     const response = await paystackAPI('GET', `/transaction/verify/${reference}`);
     
-    // Check if this is a callback from Paystack
-    const isPaystackCallback = req.query.trxref || req.query.reference;
+    // Check if payment was successful
+    const success = response?.data?.status === 'success';
+    const metadata = response?.data?.metadata;
     
-    if (isPaystackCallback) {
-      // This is a callback from Paystack, redirect to app
-      const status = response?.data?.status === 'success' ? 'success' : 'failed';
-      const redirectUrl = `dfirsttrader://payment/verify?reference=${reference}&status=${status}&screen=trading`;
-      console.log('Redirecting to app:', redirectUrl);
-      res.redirect(redirectUrl);
-      return;
-    }
-
-    // For API requests, return JSON response
-    res.json(response);
+    // Always redirect to app with appropriate status
+    const redirectUrl = `dfirsttrader://payment/verify?reference=${reference}&status=${success ? 'success' : 'failed'}&screen=trading`;
+    console.log('Redirecting to app:', redirectUrl);
+    res.redirect(redirectUrl);
   } catch (error) {
     console.error('Payment verification error:', error);
-    
-    // If this is a callback, redirect to app with error
-    if (req.query.trxref || req.query.reference) {
-      const redirectUrl = `dfirsttrader://payment/verify?reference=${req.params.reference}&status=failed&error=${encodeURIComponent(error.message)}&screen=trading`;
-      res.redirect(redirectUrl);
-      return;
-    }
-
-    res.status(500).json({
-      status: false,
-      message: 'Payment verification failed'
-    });
+    const redirectUrl = `dfirsttrader://payment/verify?reference=${req.query.reference}&status=failed&error=${encodeURIComponent(error.message)}&screen=trading`;
+    res.redirect(redirectUrl);
   }
 });
 
@@ -178,6 +168,7 @@ app.post('/webhook', async (req, res) => {
       switch(event.event) {
         case 'charge.success':
           console.log('Payment successful:', event.data);
+          // Here you could trigger any additional success handling
           break;
         
         case 'transfer.success':
