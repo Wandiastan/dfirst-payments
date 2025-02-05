@@ -1,6 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const dotenv = require('dotenv');
+const crypto = require('crypto');
 const Paystack = require('paystack-node');
 
 dotenv.config();
@@ -14,9 +15,52 @@ const paystack = new Paystack(process.env.PAYSTACK_SECRET_KEY);
 app.use(cors());
 app.use(express.json());
 
+// Error handling middleware
+app.use((err, req, res, next) => {
+  console.error('Server error:', err);
+  res.status(500).json({
+    status: 'error',
+    message: 'Internal server error',
+    error: err.message
+  });
+});
+
 // Health check endpoint
 app.get('/', (req, res) => {
-  res.json({ status: 'Payment server is running' });
+  res.json({ status: 'success', message: 'Payment server is running' });
+});
+
+// Payment initialization endpoint
+app.post('/payment/initialize', async (req, res) => {
+  try {
+    const { email, amount, callback_url, metadata } = req.body;
+
+    if (!email || !amount) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'Email and amount are required'
+      });
+    }
+
+    const response = await paystack.initializeTransaction({
+      email,
+      amount,
+      callback_url,
+      metadata
+    });
+
+    res.json({
+      status: true,
+      message: 'Payment initialized',
+      data: response.data
+    });
+  } catch (error) {
+    console.error('Payment initialization error:', error);
+    res.status(500).json({
+      status: 'error',
+      message: error.message || 'Failed to initialize payment'
+    });
+  }
 });
 
 // Payment verification endpoint
@@ -26,14 +70,12 @@ app.get('/payment/verify/:reference', async (req, res) => {
     const response = await paystack.verifyTransaction(reference);
 
     if (response.data.status === 'success') {
-      // Payment successful
       res.json({
         status: 'success',
         message: 'Payment verified successfully',
         data: response.data
       });
     } else {
-      // Payment failed
       res.status(400).json({
         status: 'error',
         message: 'Payment verification failed',
@@ -60,20 +102,16 @@ app.post('/webhook', async (req, res) => {
     if (hash === req.headers['x-paystack-signature']) {
       const event = req.body;
       
-      // Handle different event types
       switch(event.event) {
         case 'charge.success':
-          // Handle successful charge
           console.log('Payment successful:', event.data);
           break;
         
         case 'transfer.success':
-          // Handle successful transfer
           console.log('Transfer successful:', event.data);
           break;
         
         default:
-          // Handle other events
           console.log('Unhandled event:', event);
       }
 
@@ -87,6 +125,7 @@ app.post('/webhook', async (req, res) => {
   }
 });
 
+// Start server
 app.listen(port, () => {
   console.log(`Payment server running on port ${port}`);
 }); 
