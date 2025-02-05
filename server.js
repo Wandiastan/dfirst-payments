@@ -143,14 +143,35 @@ app.get('/payment/verify', async (req, res) => {
     const success = response?.data?.status === 'success';
     const metadata = response?.data?.metadata;
     
-    // Always redirect to app with appropriate status
-    const redirectUrl = `dfirsttrader://payment/verify?reference=${reference}&status=${success ? 'success' : 'failed'}&screen=trading`;
-    console.log('Redirecting to app:', redirectUrl);
-    res.redirect(redirectUrl);
+    // Check if client accepts JSON (API request) or HTML (browser redirect)
+    const acceptsJson = req.headers.accept?.includes('application/json');
+    
+    if (acceptsJson) {
+      // Return JSON response for API requests
+      res.json(response);
+    } else {
+      // Redirect to app for browser requests
+      const redirectUrl = `dfirsttrader://payment/verify?reference=${reference}&status=${success ? 'success' : 'failed'}&screen=trading`;
+      console.log('Redirecting to app:', redirectUrl);
+      res.redirect(redirectUrl);
+    }
   } catch (error) {
     console.error('Payment verification error:', error);
-    const redirectUrl = `dfirsttrader://payment/verify?reference=${req.query.reference}&status=failed&error=${encodeURIComponent(error.message)}&screen=trading`;
-    res.redirect(redirectUrl);
+    
+    // Check if client accepts JSON
+    const acceptsJson = req.headers.accept?.includes('application/json');
+    
+    if (acceptsJson) {
+      // Return error as JSON for API requests
+      res.status(500).json({
+        status: false,
+        message: error.message || 'Payment verification failed'
+      });
+    } else {
+      // Redirect to app with error for browser requests
+      const redirectUrl = `dfirsttrader://payment/verify?reference=${req.query.reference}&status=failed&error=${encodeURIComponent(error.message)}&screen=trading`;
+      res.redirect(redirectUrl);
+    }
   }
 });
 
