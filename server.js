@@ -166,8 +166,8 @@ app.get('/payment/verify', async (req, res) => {
       // Return JSON response for API requests
       res.json(response);
     } else {
-      // Redirect to app for browser requests with all necessary data
-      const redirectUrl = `dfirsttrader://payment/verify?reference=${reference}&status=${success ? 'success' : 'failed'}&screen=trading&botName=${encodeURIComponent(metadata?.botName || '')}&tier=${encodeURIComponent(metadata?.tier || '')}`;
+      // Redirect directly to trading screen with status
+      const redirectUrl = `dfirsttrader://bots/trading?reference=${reference}&status=${success ? 'success' : 'failed'}&botName=${encodeURIComponent(metadata?.botName || '')}`;
       console.log('Redirecting to app:', redirectUrl);
       res.redirect(redirectUrl);
     }
@@ -186,7 +186,8 @@ app.get('/payment/verify', async (req, res) => {
         message: error.message || 'Payment verification failed'
       });
     } else {
-      const redirectUrl = `dfirsttrader://payment/verify?reference=${req.query.reference}&status=failed&error=${encodeURIComponent(error.message)}&screen=trading`;
+      // Redirect to trading screen on error
+      const redirectUrl = `dfirsttrader://bots/trading?reference=${req.query.reference}&status=failed&error=${encodeURIComponent(error.message)}`;
       res.redirect(redirectUrl);
     }
   }
