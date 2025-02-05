@@ -82,72 +82,10 @@ app.post('/payment/initialize', async (req, res) => {
       ? 'https://dfirst-payments.onrender.com'
       : `http://localhost:${port}`;
 
-    // Handle M-Pesa payment
-    if (metadata?.paymentMethod === 'mpesa' && metadata?.phoneNumber) {
-      console.log('Initializing M-Pesa payment via Payment Page:', {
-        amount,
-        phone: metadata.phoneNumber,
-        email
-      });
-
-      try {
-        // Initialize payment page for M-Pesa
-        const paymentPageData = {
-          email,
-          amount: amount,
-          currency: "KES",
-          metadata: {
-            custom_fields: [
-              {
-                display_name: "Bot Tier",
-                variable_name: "bot_tier",
-                value: metadata.tier
-              },
-              {
-                display_name: "Subscription Type",
-                variable_name: "subscription_type",
-                value: metadata.subscriptionType
-              },
-              {
-                display_name: "User ID",
-                variable_name: "user_id",
-                value: metadata.userId
-              },
-              {
-                display_name: "Phone Number",
-                variable_name: "phone_number",
-                value: metadata.phoneNumber
-              }
-            ],
-            ...metadata
-          },
-          callback_url: `${serverUrl}/payment/verify`,
-          channels: ['mobile_money', 'mpesa', 'card'],
-          payment_options: "mobilemoney,mpesa",
-          redirect_url: metadata.returnUrl
-        };
-
-        console.log('Initializing Payment Page with data:', paymentPageData);
-
-        const pageResponse = await paystackAPI('POST', '/transaction/initialize', paymentPageData);
-
-        console.log('Payment Page response:', pageResponse);
-
-        if (!pageResponse.status) {
-          throw new Error(pageResponse.message || 'Failed to initialize payment page');
-        }
-
-        return res.json(pageResponse);
-      } catch (mpesaError) {
-        console.error('Payment page initialization error:', mpesaError);
-        throw new Error('Failed to initialize payment: ' + mpesaError.message);
-      }
-    }
-
-    // Handle card payment with correct amount multiplication
+    // Prepare data for Paystack API
     const paystackData = {
       email,
-      amount: amount * 100, // Only multiply by 100 for card payments
+      amount: Math.round(amount * 100),
       callback_url: `${serverUrl}/payment/verify`,
       metadata: {
         custom_fields: [
@@ -285,50 +223,6 @@ app.post('/webhook', async (req, res) => {
     }
   } catch (error) {
     console.error('Webhook error:', error);
-    res.sendStatus(500);
-  }
-});
-
-// Add M-Pesa webhook handler
-app.post('/mpesa/webhook', async (req, res) => {
-  try {
-    const event = req.body;
-    console.log('M-Pesa webhook received:', event);
-
-    if (event.event === 'charge.success' && event.data.channel === 'mobile_money') {
-      const reference = event.data.reference;
-      const metadata = event.data.metadata;
-
-      // Update payment status
-      console.log('Processing successful M-Pesa payment:', {
-        reference,
-        metadata
-      });
-
-      // Verify the payment
-      const verificationResponse = await paystackAPI('GET', `/transaction/verify/${reference}`);
-      
-      if (verificationResponse.data.status === 'success') {
-        // Handle successful payment verification
-        console.log('M-Pesa payment verified:', verificationResponse.data);
-        
-        // Add verification tracking
-        const verificationKey = `verification_${reference}`;
-        global[verificationKey] = {
-          status: true,
-          data: verificationResponse.data
-        };
-
-        // Clear verification cache after 5 minutes
-        setTimeout(() => {
-          delete global[verificationKey];
-        }, 5 * 60 * 1000);
-      }
-    }
-
-    res.sendStatus(200);
-  } catch (error) {
-    console.error('M-Pesa webhook error:', error);
     res.sendStatus(500);
   }
 });
