@@ -170,11 +170,19 @@ app.post('/webhook', async (req, res) => {
 app.listen(port, async () => {
   console.log(`Payment server running on port ${port}`);
   
-  // Log server IP for Paystack whitelisting
+  // Log server IP and Render.com IPs for Paystack whitelisting
   try {
     const response = await fetch('https://api.ipify.org?format=json');
     const data = await response.json();
-    console.log('Server IP Address (Add this to Paystack IP Whitelist):', data.ip);
+    console.log('\nPaystack IP Whitelist Configuration:');
+    console.log('-----------------------------------');
+    console.log('1. Add your current server IP:', data.ip);
+    console.log('\n2. Add these Render.com IPs:');
+    console.log('   - 35.196.132.4');
+    console.log('   - 35.196.132.8');
+    console.log('   - 35.196.132.12');
+    console.log('   - 35.196.132.16');
+    console.log('-----------------------------------\n');
   } catch (error) {
     console.error('Failed to get server IP:', error);
   }
