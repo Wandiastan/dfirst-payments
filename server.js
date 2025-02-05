@@ -76,16 +76,36 @@ app.post('/payment/initialize', async (req, res) => {
       });
     }
 
-    const data = {
+    // Prepare data for Paystack API
+    const paystackData = {
       email,
       amount: Math.round(amount * 100),
       callback_url,
-      metadata: JSON.stringify(metadata),
+      metadata: JSON.stringify({
+        custom_fields: [
+          {
+            display_name: "Bot Tier",
+            variable_name: "bot_tier",
+            value: metadata.tier
+          },
+          {
+            display_name: "Subscription Type",
+            variable_name: "subscription_type",
+            value: metadata.subscriptionType
+          },
+          {
+            display_name: "User ID",
+            variable_name: "user_id",
+            value: metadata.userId
+          }
+        ],
+        ...metadata
+      }),
       currency: 'KES',
       channels: ['card']
     };
 
-    const response = await paystackAPI('POST', '/transaction/initialize', data);
+    const response = await paystackAPI('POST', '/transaction/initialize', paystackData);
     res.json(response);
   } catch (error) {
     console.error('Payment initialization error:', error);
