@@ -166,22 +166,10 @@ app.get('/payment/verify', async (req, res) => {
       // Return JSON response for API requests
       res.json(response);
     } else {
-      // First send a success response
-      res.send(`
-        <html>
-          <body>
-            <script>
-              setTimeout(function() {
-                window.location.href = 'dfirsttrader://payment/verify?reference=${reference}&status=${success ? 'success' : 'failed'}&screen=bots/trading&botName=${encodeURIComponent(metadata?.botName || '')}&tier=${encodeURIComponent(metadata?.tier || '')}';
-              }, 1000);
-            </script>
-            <div style="text-align: center; padding: 20px;">
-              <h2>Payment ${success ? 'Successful' : 'Failed'}</h2>
-              <p>Redirecting back to app...</p>
-            </div>
-          </body>
-        </html>
-      `);
+      // Redirect to app for browser requests with all necessary data
+      const redirectUrl = `dfirsttrader://payment/verify?reference=${reference}&status=${success ? 'success' : 'failed'}&screen=trading&botName=${encodeURIComponent(metadata?.botName || '')}&tier=${encodeURIComponent(metadata?.tier || '')}`;
+      console.log('Redirecting to app:', redirectUrl);
+      res.redirect(redirectUrl);
     }
 
     // Clear verification cache after 5 minutes
@@ -198,21 +186,8 @@ app.get('/payment/verify', async (req, res) => {
         message: error.message || 'Payment verification failed'
       });
     } else {
-      res.send(`
-        <html>
-          <body>
-            <script>
-              setTimeout(function() {
-                window.location.href = 'dfirsttrader://payment/verify?reference=${req.query.reference}&status=failed&error=${encodeURIComponent(error.message)}&screen=bots/trading';
-              }, 1000);
-            </script>
-            <div style="text-align: center; padding: 20px;">
-              <h2>Payment Failed</h2>
-              <p>Redirecting back to app...</p>
-            </div>
-          </body>
-        </html>
-      `);
+      const redirectUrl = `dfirsttrader://payment/verify?reference=${req.query.reference}&status=failed&error=${encodeURIComponent(error.message)}&screen=trading`;
+      res.redirect(redirectUrl);
     }
   }
 });
