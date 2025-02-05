@@ -84,23 +84,18 @@ app.post('/payment/initialize', async (req, res) => {
 
     // Handle M-Pesa payment
     if (metadata?.paymentMethod === 'mpesa' && metadata?.phoneNumber) {
-      console.log('Initializing M-Pesa payment:', {
+      console.log('Initializing M-Pesa payment via Payment Page:', {
         amount,
         phone: metadata.phoneNumber,
         email
       });
 
       try {
-        // Initialize M-Pesa payment according to Paystack docs
-        const mpesaData = {
+        // Initialize payment page for M-Pesa
+        const paymentPageData = {
           email,
           amount: amount,
           currency: "KES",
-          mobile_money: {
-            phone: metadata.phoneNumber,
-            provider: "mpesa"
-          },
-          channels: ["mobile_money"],
           metadata: {
             custom_fields: [
               {
@@ -117,28 +112,35 @@ app.post('/payment/initialize', async (req, res) => {
                 display_name: "User ID",
                 variable_name: "user_id",
                 value: metadata.userId
+              },
+              {
+                display_name: "Phone Number",
+                variable_name: "phone_number",
+                value: metadata.phoneNumber
               }
             ],
             ...metadata
           },
           callback_url: `${serverUrl}/payment/verify`,
-          return_url: metadata.returnUrl
+          channels: ['mobile_money', 'mpesa', 'card'],
+          payment_options: "mobilemoney,mpesa",
+          redirect_url: metadata.returnUrl
         };
 
-        console.log('Initializing M-Pesa payment with data:', mpesaData);
+        console.log('Initializing Payment Page with data:', paymentPageData);
 
-        const stkResponse = await paystackAPI('POST', '/transaction/initialize', mpesaData);
+        const pageResponse = await paystackAPI('POST', '/transaction/initialize', paymentPageData);
 
-        console.log('M-Pesa STK response:', stkResponse);
+        console.log('Payment Page response:', pageResponse);
 
-        if (!stkResponse.status) {
-          throw new Error(stkResponse.message || 'Failed to initialize M-Pesa payment');
+        if (!pageResponse.status) {
+          throw new Error(pageResponse.message || 'Failed to initialize payment page');
         }
 
-        return res.json(stkResponse);
+        return res.json(pageResponse);
       } catch (mpesaError) {
-        console.error('M-Pesa initialization error:', mpesaError);
-        throw new Error('Failed to initialize M-Pesa payment: ' + mpesaError.message);
+        console.error('Payment page initialization error:', mpesaError);
+        throw new Error('Failed to initialize payment: ' + mpesaError.message);
       }
     }
 
