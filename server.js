@@ -68,7 +68,7 @@ app.get('/', (req, res) => {
 // Payment initialization endpoint
 app.post('/payment/initialize', async (req, res) => {
   try {
-    const { email, amount, callback_url, metadata } = req.body;
+    const { email, amount, metadata } = req.body;
 
     if (!email || !amount) {
       return res.status(400).json({
@@ -81,7 +81,7 @@ app.post('/payment/initialize', async (req, res) => {
     const paystackData = {
       email,
       amount: Math.round(amount * 100),
-      callback_url,
+      callback_url: 'dfirsttrader://payment/verify', // Direct app scheme callback
       metadata: JSON.stringify({
         custom_fields: [
           {
@@ -123,9 +123,11 @@ app.get('/payment/verify/:reference', async (req, res) => {
     const { reference } = req.params;
     const response = await paystackAPI('GET', `/transaction/verify/${reference}`);
     
-    // If this is a browser request, redirect back to the app
+    // Always redirect to app with appropriate status
+    const redirectUrl = `dfirsttrader://payment/verify?reference=${reference}&status=${response.data.status === 'success' ? 'success' : 'failed'}`;
+    
+    // For browser requests, redirect
     if (req.headers['user-agent']?.includes('Mozilla')) {
-      const redirectUrl = `dfirsttrader://payment/verify?reference=${reference}&status=${response.status ? 'success' : 'failed'}`;
       res.redirect(redirectUrl);
       return;
     }
@@ -135,9 +137,10 @@ app.get('/payment/verify/:reference', async (req, res) => {
   } catch (error) {
     console.error('Payment verification error:', error);
     
-    // If this is a browser request, redirect back to app with error
+    // For browser requests, redirect with error
     if (req.headers['user-agent']?.includes('Mozilla')) {
-      res.redirect(`dfirsttrader://payment/verify?status=failed&error=${encodeURIComponent(error.message)}`);
+      const redirectUrl = `dfirsttrader://payment/verify?reference=${req.params.reference}&status=failed&error=${encodeURIComponent(error.message)}`;
+      res.redirect(redirectUrl);
       return;
     }
 
