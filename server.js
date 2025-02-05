@@ -82,7 +82,62 @@ app.post('/payment/initialize', async (req, res) => {
       ? 'https://dfirst-payments.onrender.com'
       : `http://localhost:${port}`;
 
-    // Prepare data for Paystack API
+    // Handle M-Pesa payment
+    if (metadata?.paymentMethod === 'mpesa' && metadata?.phoneNumber) {
+      console.log('Initializing M-Pesa payment:', {
+        amount,
+        phone: metadata.phoneNumber,
+        email
+      });
+
+      try {
+        // Initialize STK Push
+        const stkResponse = await paystackAPI('POST', '/transaction/initialize', {
+          email,
+          amount: Math.round(amount * 100),
+          currency: 'KES',
+          channels: ['mobile_money'],
+          mobile_money: {
+            phone: metadata.phoneNumber,
+            provider: 'mpesa'
+          },
+          metadata: {
+            custom_fields: [
+              {
+                display_name: "Bot Tier",
+                variable_name: "bot_tier",
+                value: metadata.tier
+              },
+              {
+                display_name: "Subscription Type",
+                variable_name: "subscription_type",
+                value: metadata.subscriptionType
+              },
+              {
+                display_name: "User ID",
+                variable_name: "user_id",
+                value: metadata.userId
+              }
+            ],
+            ...metadata
+          },
+          callback_url: `${serverUrl}/payment/verify`
+        });
+
+        console.log('M-Pesa STK response:', stkResponse);
+
+        if (!stkResponse.status) {
+          throw new Error(stkResponse.message || 'Failed to initialize M-Pesa payment');
+        }
+
+        return res.json(stkResponse);
+      } catch (mpesaError) {
+        console.error('M-Pesa initialization error:', mpesaError);
+        throw new Error('Failed to initialize M-Pesa payment: ' + mpesaError.message);
+      }
+    }
+
+    // Handle card payment
     const paystackData = {
       email,
       amount: Math.round(amount * 100),
@@ -223,6 +278,50 @@ app.post('/webhook', async (req, res) => {
     }
   } catch (error) {
     console.error('Webhook error:', error);
+    res.sendStatus(500);
+  }
+});
+
+// Add M-Pesa webhook handler
+app.post('/mpesa/webhook', async (req, res) => {
+  try {
+    const event = req.body;
+    console.log('M-Pesa webhook received:', event);
+
+    if (event.event === 'charge.success' && event.data.channel === 'mobile_money') {
+      const reference = event.data.reference;
+      const metadata = event.data.metadata;
+
+      // Update payment status
+      console.log('Processing successful M-Pesa payment:', {
+        reference,
+        metadata
+      });
+
+      // Verify the payment
+      const verificationResponse = await paystackAPI('GET', `/transaction/verify/${reference}`);
+      
+      if (verificationResponse.data.status === 'success') {
+        // Handle successful payment verification
+        console.log('M-Pesa payment verified:', verificationResponse.data);
+        
+        // Add verification tracking
+        const verificationKey = `verification_${reference}`;
+        global[verificationKey] = {
+          status: true,
+          data: verificationResponse.data
+        };
+
+        // Clear verification cache after 5 minutes
+        setTimeout(() => {
+          delete global[verificationKey];
+        }, 5 * 60 * 1000);
+      }
+    }
+
+    res.sendStatus(200);
+  } catch (error) {
+    console.error('M-Pesa webhook error:', error);
     res.sendStatus(500);
   }
 });
