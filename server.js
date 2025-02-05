@@ -42,12 +42,24 @@ app.post('/payment/initialize', async (req, res) => {
       });
     }
 
+    // Convert metadata to string as required by Paystack
+    const stringifiedMetadata = JSON.stringify(metadata);
+
     const response = await paystack.initializeTransaction({
       email,
       amount,
       callback_url,
-      metadata
+      metadata: stringifiedMetadata, // Send stringified metadata
+      channels: ['card'], // Specify allowed payment channels
+      currency: 'KES' // Specify currency
     });
+
+    if (!response.status) {
+      return res.status(400).json({
+        status: 'error',
+        message: response.message || 'Payment initialization failed'
+      });
+    }
 
     res.json({
       status: true,
