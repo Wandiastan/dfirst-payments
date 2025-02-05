@@ -3,6 +3,7 @@ const cors = require('cors');
 const dotenv = require('dotenv');
 const crypto = require('crypto');
 const https = require('https');
+const fetch = require('node-fetch');
 
 dotenv.config();
 
@@ -166,6 +167,15 @@ app.post('/webhook', async (req, res) => {
 });
 
 // Start server
-app.listen(port, () => {
+app.listen(port, async () => {
   console.log(`Payment server running on port ${port}`);
+  
+  // Log server IP for Paystack whitelisting
+  try {
+    const response = await fetch('https://api.ipify.org?format=json');
+    const data = await response.json();
+    console.log('Server IP Address (Add this to Paystack IP Whitelist):', data.ip);
+  } catch (error) {
+    console.error('Failed to get server IP:', error);
+  }
 }); 
