@@ -91,17 +91,16 @@ app.post('/payment/initialize', async (req, res) => {
       });
 
       try {
-        // Initialize STK Push with correct amount (no multiplication needed for M-Pesa)
-        const stkResponse = await paystackAPI('POST', '/transaction/initialize', {
+        // Initialize M-Pesa payment according to Paystack docs
+        const mpesaData = {
           email,
-          amount: amount, // Use original amount for M-Pesa
-          currency: 'KES',
-          channels: ['mobile_money'],
+          amount: amount,
+          currency: "KES",
           mobile_money: {
             phone: metadata.phoneNumber,
-            provider: 'mpesa'
+            provider: "mpesa"
           },
-          payment_method: 'mobile_money',
+          channels: ["mobile_money"],
           metadata: {
             custom_fields: [
               {
@@ -122,8 +121,13 @@ app.post('/payment/initialize', async (req, res) => {
             ],
             ...metadata
           },
-          callback_url: `${serverUrl}/payment/verify`
-        });
+          callback_url: `${serverUrl}/payment/verify`,
+          return_url: metadata.returnUrl
+        };
+
+        console.log('Initializing M-Pesa payment with data:', mpesaData);
+
+        const stkResponse = await paystackAPI('POST', '/transaction/initialize', mpesaData);
 
         console.log('M-Pesa STK response:', stkResponse);
 
