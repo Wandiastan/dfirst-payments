@@ -143,6 +143,11 @@ app.get('/payment/verify', async (req, res) => {
     const success = response?.data?.status === 'success';
     const metadata = response?.data?.metadata;
     
+    // Add payment reference to metadata
+    if (success && metadata) {
+      metadata.paymentReference = reference;
+    }
+    
     // Check if client accepts JSON (API request) or HTML (browser redirect)
     const acceptsJson = req.headers.accept?.includes('application/json');
     
