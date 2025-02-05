@@ -2,18 +2,52 @@ const express = require('express');
 const cors = require('cors');
 const dotenv = require('dotenv');
 const crypto = require('crypto');
-const Paystack = require('paystack-node');
+const https = require('https');
 
 dotenv.config();
 
 const app = express();
 const port = process.env.PORT || 3000;
 
-// Initialize Paystack
-const paystack = new Paystack(process.env.PAYSTACK_SECRET_KEY);
-
 app.use(cors());
 app.use(express.json());
+
+// Paystack API helper
+const paystackAPI = async (method, path, data = null) => {
+  const options = {
+    hostname: 'api.paystack.co',
+    port: 443,
+    path,
+    method,
+    headers: {
+      Authorization: `Bearer ${process.env.PAYSTACK_SECRET_KEY}`,
+      'Content-Type': 'application/json'
+    }
+  };
+
+  return new Promise((resolve, reject) => {
+    const req = https.request(options, res => {
+      let data = '';
+
+      res.on('data', chunk => {
+        data += chunk;
+      });
+
+      res.on('end', () => {
+        resolve(JSON.parse(data));
+      });
+    });
+
+    req.on('error', error => {
+      reject(error);
+    });
+
+    if (data) {
+      req.write(JSON.stringify(data));
+    }
+    req.end();
+  });
+};
 
 // Error handling middleware
 app.use((err, req, res, next) => {
@@ -37,39 +71,26 @@ app.post('/payment/initialize', async (req, res) => {
 
     if (!email || !amount) {
       return res.status(400).json({
-        status: 'error',
+        status: false,
         message: 'Email and amount are required'
       });
     }
 
-    // Convert metadata to string as required by Paystack
-    const stringifiedMetadata = JSON.stringify(metadata);
-
-    const response = await paystack.initializeTransaction({
+    const data = {
       email,
-      amount,
+      amount: Math.round(amount * 100),
       callback_url,
-      metadata: stringifiedMetadata, // Send stringified metadata
-      channels: ['card'], // Specify allowed payment channels
-      currency: 'KES' // Specify currency
-    });
+      metadata: JSON.stringify(metadata),
+      currency: 'KES',
+      channels: ['card']
+    };
 
-    if (!response.status) {
-      return res.status(400).json({
-        status: 'error',
-        message: response.message || 'Payment initialization failed'
-      });
-    }
-
-    res.json({
-      status: true,
-      message: 'Payment initialized',
-      data: response.data
-    });
+    const response = await paystackAPI('POST', '/transaction/initialize', data);
+    res.json(response);
   } catch (error) {
     console.error('Payment initialization error:', error);
     res.status(500).json({
-      status: 'error',
+      status: false,
       message: error.message || 'Failed to initialize payment'
     });
   }
@@ -78,28 +99,14 @@ app.post('/payment/initialize', async (req, res) => {
 // Payment verification endpoint
 app.get('/payment/verify/:reference', async (req, res) => {
   try {
-    const reference = req.params.reference;
-    const response = await paystack.verifyTransaction(reference);
-
-    if (response.data.status === 'success') {
-      res.json({
-        status: 'success',
-        message: 'Payment verified successfully',
-        data: response.data
-      });
-    } else {
-      res.status(400).json({
-        status: 'error',
-        message: 'Payment verification failed',
-        data: response.data
-      });
-    }
+    const { reference } = req.params;
+    const response = await paystackAPI('GET', `/transaction/verify/${reference}`);
+    res.json(response);
   } catch (error) {
     console.error('Payment verification error:', error);
     res.status(500).json({
-      status: 'error',
-      message: 'Internal server error',
-      error: error.message
+      status: false,
+      message: 'Payment verification failed'
     });
   }
 });
@@ -107,7 +114,8 @@ app.get('/payment/verify/:reference', async (req, res) => {
 // Webhook endpoint for Paystack
 app.post('/webhook', async (req, res) => {
   try {
-    const hash = crypto.createHmac('sha512', process.env.PAYSTACK_SECRET_KEY)
+    const hash = crypto
+      .createHmac('sha512', process.env.PAYSTACK_SECRET_KEY)
       .update(JSON.stringify(req.body))
       .digest('hex');
 
