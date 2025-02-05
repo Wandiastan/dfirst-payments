@@ -122,9 +122,25 @@ app.get('/payment/verify/:reference', async (req, res) => {
   try {
     const { reference } = req.params;
     const response = await paystackAPI('GET', `/transaction/verify/${reference}`);
+    
+    // If this is a browser request, redirect back to the app
+    if (req.headers['user-agent']?.includes('Mozilla')) {
+      const redirectUrl = `dfirsttrader://payment/verify?reference=${reference}&status=${response.status ? 'success' : 'failed'}`;
+      res.redirect(redirectUrl);
+      return;
+    }
+
+    // For API requests, return JSON response
     res.json(response);
   } catch (error) {
     console.error('Payment verification error:', error);
+    
+    // If this is a browser request, redirect back to app with error
+    if (req.headers['user-agent']?.includes('Mozilla')) {
+      res.redirect(`dfirsttrader://payment/verify?status=failed&error=${encodeURIComponent(error.message)}`);
+      return;
+    }
+
     res.status(500).json({
       status: false,
       message: 'Payment verification failed'
