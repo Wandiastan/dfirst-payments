@@ -138,8 +138,8 @@ app.get('/payment/verify/:reference', async (req, res) => {
     
     if (isPaystackCallback) {
       // This is a callback from Paystack, redirect to app
-      const status = response.data.status === 'success' ? 'success' : 'failed';
-      const redirectUrl = `dfirsttrader://payment/verify?reference=${reference}&status=${status}`;
+      const status = response?.data?.status === 'success' ? 'success' : 'failed';
+      const redirectUrl = `dfirsttrader://payment/verify?reference=${reference}&status=${status}&screen=trading`;
       console.log('Redirecting to app:', redirectUrl);
       res.redirect(redirectUrl);
       return;
@@ -152,7 +152,7 @@ app.get('/payment/verify/:reference', async (req, res) => {
     
     // If this is a callback, redirect to app with error
     if (req.query.trxref || req.query.reference) {
-      const redirectUrl = `dfirsttrader://payment/verify?reference=${req.params.reference}&status=failed&error=${encodeURIComponent(error.message)}`;
+      const redirectUrl = `dfirsttrader://payment/verify?reference=${req.params.reference}&status=failed&error=${encodeURIComponent(error.message)}&screen=trading`;
       res.redirect(redirectUrl);
       return;
     }
