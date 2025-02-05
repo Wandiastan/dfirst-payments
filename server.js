@@ -136,6 +136,14 @@ app.get('/payment/verify', async (req, res) => {
       throw new Error('No reference provided');
     }
 
+    // Add verification tracking
+    const verificationKey = `verification_${reference}`;
+    if (global[verificationKey]) {
+      console.log('Payment already verified:', reference);
+      // Return cached result
+      return res.json(global[verificationKey]);
+    }
+
     console.log('Verifying payment reference:', reference);
     const response = await paystackAPI('GET', `/transaction/verify/${reference}`);
     
@@ -147,6 +155,9 @@ app.get('/payment/verify', async (req, res) => {
     if (success && metadata) {
       metadata.paymentReference = reference;
     }
+
+    // Cache verification result
+    global[verificationKey] = response;
     
     // Check if client accepts JSON (API request) or HTML (browser redirect)
     const acceptsJson = req.headers.accept?.includes('application/json');
@@ -155,25 +166,26 @@ app.get('/payment/verify', async (req, res) => {
       // Return JSON response for API requests
       res.json(response);
     } else {
-      // Redirect to app for browser requests
-      const redirectUrl = `dfirsttrader://payment/verify?reference=${reference}&status=${success ? 'success' : 'failed'}&screen=trading`;
+      // Redirect to app for browser requests with all necessary data
+      const redirectUrl = `dfirsttrader://payment/verify?reference=${reference}&status=${success ? 'success' : 'failed'}&screen=trading&botName=${encodeURIComponent(metadata?.botName || '')}&tier=${encodeURIComponent(metadata?.tier || '')}`;
       console.log('Redirecting to app:', redirectUrl);
       res.redirect(redirectUrl);
     }
+
+    // Clear verification cache after 5 minutes
+    setTimeout(() => {
+      delete global[verificationKey];
+    }, 5 * 60 * 1000);
   } catch (error) {
     console.error('Payment verification error:', error);
     
-    // Check if client accepts JSON
     const acceptsJson = req.headers.accept?.includes('application/json');
-    
     if (acceptsJson) {
-      // Return error as JSON for API requests
       res.status(500).json({
         status: false,
         message: error.message || 'Payment verification failed'
       });
     } else {
-      // Redirect to app with error for browser requests
       const redirectUrl = `dfirsttrader://payment/verify?reference=${req.query.reference}&status=failed&error=${encodeURIComponent(error.message)}&screen=trading`;
       res.redirect(redirectUrl);
     }
