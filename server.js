@@ -86,7 +86,7 @@ app.post('/payment/initialize', async (req, res) => {
     const paystackData = {
       email,
       amount: Math.round(amount * 100),
-      callback_url: `${serverUrl}/payment/verify`,
+      callback_url: metadata.returnUrl || `${serverUrl}/payment/verify`,
       metadata: {
         custom_fields: [
           {
